@@ -18,7 +18,10 @@ export function useTypewriter({
   const [displayText, setDisplayText] = useState("");
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wordsRef = useRef(words);
-  wordsRef.current = words;
+
+  useEffect(() => {
+    wordsRef.current = words;
+  }, [words]);
 
   // All mutable state lives in a ref — no stale closures, no cancelled pause timeouts
   const state = useRef({
@@ -28,6 +31,8 @@ export function useTypewriter({
   });
 
   useEffect(() => {
+    state.current = { wordIndex: 0, charIndex: 0, isDeleting: false };
+
     const tick = () => {
       const s = state.current;
       const word = wordsRef.current[s.wordIndex];
@@ -37,7 +42,6 @@ export function useTypewriter({
         setDisplayText(word.slice(0, s.charIndex));
 
         if (s.charIndex === word.length) {
-          // Finished typing — pause, then start deleting
           timeoutRef.current = setTimeout(() => {
             s.isDeleting = true;
             timeoutRef.current = setTimeout(tick, deleteSpeed);
@@ -68,7 +72,7 @@ export function useTypewriter({
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
-  }, []); // mount once — refs handle all mutable state
+  }, [deleteSpeed, loop, pauseDuration, typeSpeed]);
 
   return { text: displayText };
 }
