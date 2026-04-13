@@ -1,8 +1,59 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 
+interface YTPlayerState {
+  PLAYING: number;
+  PAUSED: number;
+  ENDED: number;
+  BUFFERING: number;
+  CUED: number;
+}
+
+interface YTPlayer {
+  playVideo(): void;
+  pauseVideo(): void;
+  nextVideo(): void;
+  previousVideo(): void;
+  seekTo(seconds: number, allowSeekAhead: boolean): void;
+  getVideoData(): { title: string; video_id: string };
+  getCurrentTime(): number;
+  getDuration(): number;
+  getVolume(): number;
+  setVolume(volume: number): void;
+  destroy(): void;
+}
+
+interface YTPlayerEvent {
+  target: YTPlayer;
+}
+
+interface YTStateChangeEvent {
+  target: YTPlayer;
+  data: number;
+}
+
+interface YTPlayerOptions {
+  height: string;
+  width: string;
+  playerVars: {
+    listType: string;
+    list: string;
+    autoplay: number;
+    controls: number;
+  };
+  events: {
+    onReady: (e: YTPlayerEvent) => void;
+    onStateChange: (e: YTStateChangeEvent) => void;
+  };
+}
+
+interface YTNamespace {
+  Player: new (containerId: string, options: YTPlayerOptions) => YTPlayer;
+  PlayerState: YTPlayerState;
+}
+
 declare global {
   interface Window {
-    YT: any;
+    YT: YTNamespace;
     onYouTubeIframeAPIReady: () => void;
   }
 }
@@ -18,7 +69,7 @@ interface YouTubePlayerOptions {
 }
 
 export function useYouTubePlayer({ playlistId, containerId }: YouTubePlayerOptions) {
-  const playerRef = useRef<any>(null);
+  const playerRef = useRef<YTPlayer | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [isReady, setIsReady] = useState(false);
@@ -59,12 +110,12 @@ export function useYouTubePlayer({ playlistId, containerId }: YouTubePlayerOptio
         controls: 0,
       },
       events: {
-        onReady: (e: any) => {
+        onReady: (e: YTPlayerEvent) => {
           setIsReady(true);
           setVolumeState(e.target.getVolume());
           syncTrackInfo();
         },
-        onStateChange: (e: any) => {
+        onStateChange: (e: YTStateChangeEvent) => {
           const state = e.data;
           if (state === window.YT.PlayerState.PLAYING) {
             setIsPlaying(true);
@@ -99,11 +150,15 @@ export function useYouTubePlayer({ playlistId, containerId }: YouTubePlayerOptio
       stopInterval();
       playerRef.current?.destroy?.();
     };
-  }, []);
+  }, [initPlayer, stopInterval]);
 
   const toggle = () => {
     if (!playerRef.current) return;
-    isPlaying ? playerRef.current.pauseVideo() : playerRef.current.playVideo();
+    if (isPlaying) {
+      playerRef.current.pauseVideo();
+    } else {
+      playerRef.current.playVideo();
+    }
   };
 
   const next = () => {
